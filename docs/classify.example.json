@@ -1,0 +1,64 @@
+{
+    "$schema": "schema/1.0.json",
+    "version": "1.0",
+    "content": {
+        "example1": {
+            "min_value": 1,
+            "rules": [
+                {
+                    "value": 1,
+                    "accept": 0.6,
+                    "rect": {
+                        "type": "relative",
+                        "range": [
+                            0.5,
+                            0.5,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "pattern": "123456789"
+                }
+            ]
+        },
+        "example2": {
+            "min_value": 1,
+            "rules": [
+                {
+                    "value": 1,
+                    "accept": 0.6,
+                    "rect": {
+                        "type": "relative",
+                        "range": [
+                            0.0,
+                            0.5,
+                            0.5,
+                            1.0
+                        ]
+                    },
+                    "pattern": "(?:111111111|222222222)"
+                }
+            ]
+        }
+    },
+    "ocr_range": [
+        {
+            "type": "px",
+            "range": [
+                0,
+                -100,
+                300,
+                -1
+            ]
+        },
+        {
+            "type": "px",
+            "range": [
+                -400,
+                -100,
+                -1,
+                -1
+            ]
+        }
+    ]
+}
