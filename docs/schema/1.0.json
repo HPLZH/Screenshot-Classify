@@ -25,31 +25,7 @@
                                     "type": "number"
                                 },
                                 "rect": {
-                                    "type": "object",
-                                    "properties": {
-                                        "type": {
-                                            "oneOf": [
-                                                {
-                                                    "const": "px"
-                                                },
-                                                {
-                                                    "const": "relative"
-                                                }
-                                            ]
-                                        },
-                                        "range": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "number"
-                                            },
-                                            "minItems": 4,
-                                            "maxItems": 4
-                                        }
-                                    },
-                                    "required": [
-                                        "type",
-                                        "range"
-                                    ]
+                                    "$ref": "#/definitions/rect"
                                 },
                                 "pattern": {
                                     "type": "string",
@@ -70,38 +46,39 @@
                 ]
             }
         },
-        "ocr_range":{
-            "type":"array",
+        "ocr_range": {
+            "type": "array",
             "items": {
-                "type": "object",
-                "properties": {
-                    "type": {
-                        "oneOf": [
-                            {
-                                "const": "px"
-                            },
-                            {
-                                "const": "relative"
-                            }
-                        ]
-                    },
-                    "range": {
-                        "type": "array",
-                        "items": {
-                            "type": "number"
-                        },
-                        "minItems": 4,
-                        "maxItems": 4
-                    }
-                },
-                "required": [
-                    "type",
-                    "range"
-                ]
+                "$ref": "#/definitions/rect"
             }
         }
     },
     "required": [
         "content"
-    ]
+    ],
+    "definitions": {
+        "rect": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "enum": [
+                        "relative",
+                        "px"
+                    ]
+                },
+                "range": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    },
+                    "minItems": 4,
+                    "maxItems": 4
+                }
+            },
+            "required": [
+                "type",
+                "range"
+            ]
+        }
+    }
 }
