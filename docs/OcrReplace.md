@@ -4,30 +4,19 @@
 
 ## OCR 结果格式
 
-分类模块接受 PaddleOCR 的文本检测+文本识别输出，格式如下：
+OCR 结果需要转换为统一的格式：
 
 ```python
-[
-    [
-        [
-            # 文本检测结果，矩形的4个顶点坐标
-            [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]],
-            # 文本识别结果，识别出的文本与可靠程度
-            [("text", 1.0)]
-        ],
-        [
-            [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]],
-            [("text", 1.0)]
-        ],
-        "..."
-    ],
-    "..."
-]
+type Rect[_T] = tuple[_T, _T, _T, _T]
+type OcrItem = tuple[Rect[int | float], str, float]
+
+def ocr_func(img) -> Iterable[OcrItem]: ...
+
 ```
 
-若要替换 OCR 工具，需要把输出转换为此格式
+若要替换 OCR 工具，需要把输出转换为正确的格式
 
-若无相关输出，矩形坐标可以使用空列表以跳过文本位置检测，可靠程度可以使用 `1.0` 代替
+若无相关输出，可靠程度可以使用 `1.0` 代替
 
 ## 代码修改指南
 
@@ -36,9 +25,10 @@
 从 `ocrClassify.py` 删除以下代码行
 
 ```python
-from paddleocr import PaddleOCR
-logging.getLogger("ppocr").setLevel(logging.WARNING)
-ocr = PaddleOCR()
+def _paddleOcrLoad():
+    ...
+
+ocr = MultiThread(_paddleOcrLoad)
 ```
 
 同时，你需要引入你使用的 OCR 库

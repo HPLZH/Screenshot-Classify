@@ -1,20 +1,50 @@
-from classify import Classifier, absPos
-from paddleocr import PaddleOCR
+from classify import Classifier, absPos, absRect, OcrItem
 from PIL import Image
 import numpy as np
 import json
 import logging
+from typing import Iterable
+from ref import InitOnUse, MultiThread
+from debug import printr, interactive, println
 
-logging.getLogger("ppocr").setLevel(logging.WARNING)
 
-ocr = PaddleOCR()
+def _paddleOcrLoad():
+    import paddleocr
 
-def printr(obj, **kwargs):
-    print(obj, **kwargs)
-    return obj
+    r = paddleocr.PaddleOCR(
+        text_detection_model_name="PP-OCRv5_mobile_det",
+        text_recognition_model_name="PP-OCRv5_mobile_rec",
+        use_doc_orientation_classify=False,
+        use_textline_orientation=False,
+        use_doc_unwarping=False,
+        # enable_hpi = True,
+    )
+    return r
 
-def ocr_func(img):
-    return (ocr.ocr(img=img, cls=False))
+
+ocr = MultiThread(_paddleOcrLoad)
+
+
+def paddleTransform(result) -> list[OcrItem]:
+    r: list[OcrItem] = []
+    texts = result["rec_texts"]
+    scores = result["rec_scores"]
+    boxes = result["rec_boxes"]
+    for i in range(len(texts)):
+        text = str(texts[i])
+        score = float(scores[i])
+        box = tuple(boxes[i])
+        assert len(box) == 4
+        r.append((box, text, score))
+    # interactive(globals(), locals())
+    return r
+
+
+def ocr_func(img) -> Iterable[OcrItem]:
+    r = []
+    for o in ocr.value.predict_iter(img):
+        r += paddleTransform(o)
+    return r
 
 
 def buildClassifier(config: str):
@@ -30,16 +60,25 @@ def getResult(img: str, classifier: Classifier):
         else:
             data = []
             for ocrg in classifier.ocrRange:
-                pos1 = absPos(ocrg[1], size, ocrg[0])
-                pos2 = absPos(ocrg[2], size, ocrg[0])
-                box = list(int(x) for x in pos1 + pos2)
+                pos1 = absPos(ocrg[1][0:2], size, ocrg[0])
+                box = absRect(ocrg[1], size, ocrg[0])
                 box = tuple(
-                    box[i] if box[i] <= size[i % 2] else size[i % 2] for i in range(4)
+                    int(box[i] if box[i] <= size[i % 2] else size[i % 2])
+                    for i in range(4)
                 )
+                assert len(box) == 4
                 cropimg = imgobj.crop(box).convert("RGB")
+                if cropimg.size[0] * cropimg.size[1] == 0:
+                    continue
                 ocrr = ocr_func(np.array(cropimg))
+                # try:
+                #     ocrr = ocr_func(np.array(cropimg))
+                # except:
+                #     cropimg.save("err.png")
+                #     raise
                 data.append((ocrr, pos1))
                 pass
+            # interactive(globals(), locals())
             return classifier.multiRectClassify(data, size)
 
 

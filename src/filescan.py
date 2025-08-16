@@ -1,7 +1,9 @@
 import os
+from ref import Reference
+from typing import Callable, Any
 
 
-def listdir(path: str, recursive: bool, callback=print):
+def listdir(path: str, recursive: bool, callback: Callable[[str], Any] = print):
 
     files = os.listdir(path)
     for file in files:
@@ -12,6 +14,26 @@ def listdir(path: str, recursive: bool, callback=print):
 
         elif recursive and os.path.isdir(file_path):
             listdir(file_path, recursive, callback)
+
+
+def listdirL(path: str, recursive: bool, callback: Callable[[list[str]], Any] = print):
+
+    files = os.listdir(path)
+    paths = list(map(lambda s: os.path.join(path, s), files))
+    fs = filter(os.path.isfile, paths)
+    callback(list(fs))
+    dirs = filter(os.path.isdir, paths)
+    if recursive:
+        for d in dirs:
+            listdirL(d, recursive, callback)
+
+
+def ls(path: str, recursive: bool):
+    result: Reference[list[str]] = Reference([])
+    listdirL(
+        path=path, recursive=recursive, callback=lambda x: result.set(result.value + x)
+    )
+    return result.value
 
 
 if __name__ == "__main__":

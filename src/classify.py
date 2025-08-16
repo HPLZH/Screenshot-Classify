@@ -1,18 +1,51 @@
 import re
+from typing import TypeVar, Iterable
+from debug import interactive
+
+_T = TypeVar("_T", int, float)
+
+type Pos[_T] = tuple[_T, _T]
+type Rect[_T] = tuple[_T, _T, _T, _T]
+type OcrItem = tuple[Rect[int | float], str, float]
+type OcrRange = tuple[str, Rect[int | float]]
 
 
-def pointInRect(
-    point: tuple[int | float, int | float], rect: list[tuple[int | float, int | float]]
-):
-    return (
-        point[0] >= rect[0][0]
-        and point[1] >= rect[0][1]
-        and point[0] <= rect[1][0]
-        and point[1] <= rect[1][1]
-    )
+def isSorted(*values: _T, desc: bool = False):
+    cmp = (lambda a, b: a >= b) if desc else (lambda a, b: a <= b)
+    for i in range(1, len(values)):
+        if not cmp(values[i - 1], values[i]):
+            return False
+    return True
 
 
-def absPos(point: tuple[int | float, int | float], rect: tuple[int, int], type: str):
+def pointsToRect(point0: Pos[_T], *points: Pos[_T]) -> Rect[_T]:
+    xmin, ymin = point0
+    xmax, ymax = point0
+    for x, y in points:
+        xmin = min(xmin, x)
+        ymin = min(ymin, y)
+        xmax = max(xmax, x)
+        ymax = max(ymax, x)
+    return (xmin, ymin, xmax, ymax)
+
+
+def correctRect(rect: Rect[_T]) -> Rect[_T]:
+    x1, y1, x2, y2 = rect
+    return (min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
+
+
+def pointInRect(point: Pos[int | float], rect: Rect[int | float]):
+    x, y = point
+    x1, y1, x2, y2 = correctRect(rect)
+    return isSorted(x1, x, x2) and isSorted(y1, y, y2)
+
+
+def rectInRect(rect: Rect[int | float], bound: Rect[int | float]):
+    x1, y1, x2, y2 = rect
+    return pointInRect((x1, y1), bound) and pointInRect((x2, y2), bound)
+
+
+def absPos(point: Pos[_T], rect: tuple[int, int], type: str) -> Pos[_T]:
     if type == "relative":
         return absPos((point[0] * rect[0], point[1] * rect[1]), rect, "px")
     elif type == "px":
@@ -24,42 +57,39 @@ def absPos(point: tuple[int | float, int | float], rect: tuple[int, int], type: 
         raise Exception()
 
 
+def absRect(rect: Rect[_T], rect1: tuple[int, int], type: str) -> Rect[_T]:
+    mp0 = absPos(rect[0:2], rect1, type)
+    mp1 = absPos(rect[2:4], rect1, type)
+    return correctRect(mp0 + mp1)
+
+
 def posMap(
-    point: tuple[float, float],
-    from_ltpos: tuple[int, int],
-    to_ltpos: tuple[int, int] = (0, 0),
-):
+    point: Pos[_T],
+    from_ltpos: Pos[int],
+    to_ltpos: Pos[int] = (0, 0),
+) -> Pos[_T]:
     return (
         point[0] + from_ltpos[0] - to_ltpos[0],
         point[1] + from_ltpos[1] - to_ltpos[1],
     )
 
 
-def isOcrResultList(data: list):
-    try:
-        ocr = data[0]
-        rect = ocr[0]
-        text = ocr[1][0]
-        rel = ocr[1][1]
-        return (
-            isinstance(rect, list)
-            and len(rect) == 4
-            and isinstance(text, str)
-            and isinstance(rel, float)
-        )
-    except:
-        return False
+def rectMap(
+    rect: Rect[_T], from_ltpos: Pos[int], to_ltpos: Pos[int] = (0, 0)
+) -> Rect[_T]:
+    mp0 = posMap(rect[0:2], from_ltpos, to_ltpos)
+    mp1 = posMap(rect[2:4], from_ltpos, to_ltpos)
+    return correctRect(mp0 + mp1)
 
 
 class ClassifyRule:
     name = ""
     value = 0
     accept = 0.9
-    rect = ["relative", (0.0, 0.0), (1.0, 1.0)]
-    pattern: re.Pattern = ""
+    rect: OcrRange = ("relative", (0.0, 0.0, 1.0, 1.0))
+    pattern: re.Pattern = re.compile("")
 
     def __init__(self):
-        self.rect = self.rect[:]
         pass
 
     def __repr__(self):
@@ -79,7 +109,7 @@ class Classifier:
 
     classes = {}
     rules: list[ClassifyRule] = []
-    ocrRange = []
+    ocrRange: list[OcrRange] = []
 
     def _load_1_0_(self, data: dict):
         content = data["content"]
@@ -87,7 +117,7 @@ class Classifier:
             ocrange = data["ocr_range"]
             for rg in ocrange:
                 rga = rg["range"]
-                self.ocrRange.append([rg["type"], tuple(rga[0:2]), tuple(rga[2:4])])
+                self.ocrRange.append((rg["type"], tuple(rga[0:4])))
         for cl in content:
             self.classes[cl] = content[cl]["min_value"]
             for rule in content[cl]["rules"]:
@@ -97,16 +127,19 @@ class Classifier:
                 if "accept" in rule:
                     rc.accept = rule["accept"]
                 if "rect" in rule:
-                    rc.rect[0] = rule["rect"]["type"]
-                    range = rule["rect"]["range"]
-                    rc.rect[1] = (range[0], range[1])
-                    rc.rect[2] = (range[2], range[3])
+                    rrtype = rule["rect"]["type"]
+                    rrrect = rule["rect"]["range"]
+                    rc.rect = (rrtype, tuple(rrrect[0:4]))
                 rc.pattern = re.compile(rule["pattern"])
                 self.rules.append(rc)
                 pass
         pass
 
     def __init__(self, data: dict):
+        self.classes = {}
+        self.rules = []
+        self.ocrRange = []
+
         version = "1.0"
         loaders = {"1.0": self._load_1_0_}
         if "version" in data and data["version"] in loaders:
@@ -116,33 +149,26 @@ class Classifier:
 
     def _classify_data(
         self,
-        ocrResult: list,
+        ocrResult: Iterable[OcrItem] | None,
         imgSize: tuple[int, int],
         ltpos: tuple[int, int] = (0, 0),
-        score: dict = None,
+        score: dict | None = None,
     ):
         if score == None:
             score = {}
 
-        if ocrResult == None or len(ocrResult) == 0:
+        if ocrResult == None:
             return score
-        
-        ocrResultCpy = []
-        list(map(ocrResultCpy.extend, filter(None, ocrResult)))
 
-        for ocr in ocrResultCpy:
-            rect = ocr[0]
-            text = ocr[1][0]
-            rel = ocr[1][1]
-
+        for rect, text, rel in ocrResult:
+            gRect = rectMap(rect, ltpos)
+            #interactive(globals(), locals())
             for rule in self.rules:
                 if rel < rule.accept:
                     continue
-                rectc = [absPos(p, imgSize, rule.rect[0]) for p in rule.rect[1:3]]
-                for p in rect:
-                    if not pointInRect(posMap(p, ltpos), rectc):
-                        break
-                else:
+                rectc = absRect(rule.rect[1], imgSize, rule.rect[0])
+                #interactive(globals(), locals())
+                if rectInRect(gRect, rectc):
                     mcount = len(rule.pattern.findall(text))
                     if mcount > 0:
                         if not rule.name in score:
@@ -154,7 +180,10 @@ class Classifier:
         return score
 
     def classify(
-        self, ocrResult: list, imgSize: tuple[int, int], ltpos: tuple[int, int] = (0, 0)
+        self,
+        ocrResult: Iterable[OcrItem],
+        imgSize: tuple[int, int],
+        ltpos: Pos[int] = (0, 0),
     ):
         sc = self._classify_data(ocrResult, imgSize, ltpos)
         ret = []
@@ -165,7 +194,9 @@ class Classifier:
         return ret
 
     def multiRectClassify(
-        self, ocrResultList: list[list, tuple[int, int]], imgSize: tuple[int, int]
+        self,
+        ocrResultList: Iterable[tuple[Iterable[OcrItem], Pos[int]]],
+        imgSize: tuple[int, int],
     ):
         sc = {}
         for result, ltpos in ocrResultList:

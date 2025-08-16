@@ -68,6 +68,10 @@ python run.py src_path classify_config dst_path_format [-r] [-f filter] [-d date
 
 `-L logging_level` 用于指定日志级别，默认为 `WRANING`
 
+#### 多线程并行
+
+实验性功能，预计未来将删除此功能
+
 ## 其他文档
 
 - [分类配置文件](/docs/Classify.md)
