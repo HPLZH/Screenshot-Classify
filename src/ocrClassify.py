@@ -18,6 +18,7 @@ def _paddleOcrLoad():
         use_textline_orientation=False,
         use_doc_unwarping=False,
         # enable_hpi = True,
+        engine="transformers",
     )
     return r
 

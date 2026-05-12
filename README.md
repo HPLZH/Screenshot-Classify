@@ -12,15 +12,56 @@
 
 使用 Microsoft Store 版本时，需要启用 Windows 长路径支持
 
-### [PaddlePaddle](https://github.com/paddlepaddle/paddle)
+### 推理引擎（二选一）
+
+#### [PaddlePaddle](https://github.com/paddlepaddle/paddle)
 
 [快速安装指南](https://www.paddlepaddle.org.cn/install/quick)
 
-本项目使用 PaddleOCR，需要安装 PaddlePaddle
+如果你使用的 Python 版本较高，在安装时可能会遇到以下问题：
+
+```log
+Looking in indexes: https://www.paddlepaddle.org.cn/packages/stable/cpu/
+ERROR: Could not find a version that satisfies the requirement paddlepaddle==3.3.0 (from versions: none)
+ERROR: No matching distribution found for paddlepaddle==3.3.0
+```
+
+遇到此问题时，改用 Transformers 即可。
+
+#### [Transformers](https://github.com/huggingface/transformers)
+
+[安装文档](https://huggingface.co/docs/transformers/installation)
+
+[上面那个看不了可以看这个](https://hugging-face.cn/docs/transformers/installation)
+
+使用 Transformers 作为推理引擎时，还需要安装 `torchvision`：
+
+```shell
+pip install torchvision
+```
+
+#### 推理引擎配置
+
+推理引擎配置在 [`src/ocrClassify.py`](src/ocrClassify.py)：
+
+```python
+def _paddleOcrLoad():
+    import paddleocr
+
+    r = paddleocr.PaddleOCR(
+        # ......
+        engine="transformers",  # Line 21
+    )
+    return r
+```
+
+当前配置的推理引擎为 Transformers，使用 PaddlePaddle 请删除/注释对应的行。
 
 ### [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)
 
 [快速安装指南](https://paddlepaddle.github.io/PaddleOCR/latest/quick_start.html)
+
+屏幕截图分类只需要基础的 OCR 功能，安装时可以只安装 `paddleocr` 而不是 `paddleocr[all]`。
 
 ## 快速开始
 
